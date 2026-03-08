@@ -13,16 +13,20 @@
 
 # 1. Scope & Objective
 
-This challenge is a **Linux Binary Reverse Engineering Assessment**.  
-The objective was to analyze a provided binary file, understand its internal logic, reconstruct hidden data, and recover the final flag.
+This challenge involves **reverse engineering a Linux binary** provided in a compressed archive named **"The Vault.zip"**.
 
-The challenge file was provided as:
+The goal of the investigation is to analyze the binary, understand its internal logic, reconstruct hidden program data, and extract the **password and flag** embedded within the executable.
 
-```
-THE VAULT.zip
-```
+The assessment demonstrates practical skills in:
 
-The investigation followed standard reverse engineering procedures including reconnaissance, static analysis, disassembly inspection, and runtime verification.
+- Linux binary analysis
+- Static analysis
+- Disassembly inspection
+- Stack analysis
+- Little-endian decoding
+- Runtime reconstruction of hidden strings
+
+All analysis was performed using **standard Linux reverse engineering tools**.
 
 ---
 
@@ -30,49 +34,61 @@ The investigation followed standard reverse engineering procedures including rec
 
 ## File Enumeration
 
-Initial inspection of the provided archive.
+Initial directory inspection:
 
 ```
 ls
+```
+
+The downloaded file was:
+
+```
+The Vault.zip
+```
+
+To determine the file type:
+
+```
 file "The Vault.zip"
 ```
 
 Output:
 
 ```
-The Vault.zip: Zip archive data, made by v2.0, extract using at least v2.0,
+The Vault.zip: Zip archive data, made by v2.0,
+extract using at least v2.0,
 last modified Jan 01 1980 00:00:00,
 uncompressed size 15924,
 method=deflate
 ```
 
-### Findings
+### Observations
 
-- Confirmed that the file is a **ZIP archive**
-- Timestamp shows **January 1, 1980**, which is suspicious
-- This often indicates **metadata stripping or intentional manipulation**
-- The archive was **not encrypted**
+- The file is a **ZIP archive**
+- Timestamp shows **Jan 01 1980**
+- This timestamp is commonly used when **metadata is intentionally removed**
+- The archive **is not encrypted**
 
 ---
 
 ## Filename Issue
 
-Running the command incorrectly caused an error:
+Running:
 
 ```
 file The Vault
 ```
 
-The command fails because Linux interprets the input as:
+Resulted in an error.
+
+This occurred because Linux interpreted the command as two files:
 
 ```
 The
 Vault
 ```
 
-Two separate filenames.
-
-### Correct Command
+Correct usage requires quotation marks:
 
 ```
 file "The Vault.zip"
@@ -80,9 +96,9 @@ file "The Vault.zip"
 
 ---
 
-# 3. Archive Inspection
+## Archive Inspection
 
-The archive contents were inspected **without extracting**.
+The archive contents were inspected without extraction:
 
 ```
 unzip -l "The Vault.zip"
@@ -90,50 +106,61 @@ unzip -l "The Vault.zip"
 
 ### Findings
 
-The archive contained a directory:
+The archive contains:
 
 ```
 The Vault/vault
 ```
 
-Inside the directory was a **single file named `vault` with no extension**.
+- Only **one file**
+- No file extension
 
 ---
 
-# 4. Binary Identification
+# 3. Static Analysis
 
-The extracted file was analyzed using the `file` command.
+## Binary Identification
+
+After extracting the archive, the file type was analyzed:
 
 ```
 file vault
 ```
 
-Output analysis revealed:
+Output indicated:
 
-- **ELF Linux Executable**
-- **32-bit binary**
-- Compiled for **i386 architecture**
-- **PIE (Position Independent Executable)**
-- **Dynamically linked**
-- Uses **system libraries**
-- **NOT stripped** (debug symbols exist)
+```
+ELF 32-bit executable
+Intel 80386 architecture
+Dynamically linked
+PIE (Position Independent Executable)
+Not stripped
+```
 
-### Findings
+### Key Observations
 
-Because the binary is **not stripped**, function names remain visible, which simplifies reverse engineering.
+| Property | Meaning |
+|--------|--------|
+| ELF | Linux executable format |
+| 32-bit | Compiled for i386 architecture |
+| PIE | Position Independent Executable |
+| Dynamically Linked | Uses system libraries |
+| Not Stripped | Debug symbols and function names remain |
+
+The fact that the binary is **not stripped** makes reverse engineering significantly easier.
 
 ---
 
-# 5. Strings Analysis
+# 4. Strings Analysis
 
 ## Objective
 
 Extract readable strings from the binary to identify:
 
-- URLs
-- Hidden text
 - Commands
-- Program logic clues
+- URLs
+- Messages
+- Clues related to program logic
 
 Command used:
 
@@ -143,44 +170,65 @@ strings vault | less
 
 ### Observed String Categories
 
-The output strings were grouped into four sections:
+The extracted strings were grouped into four main categories:
 
-1. Normal system strings
-2. Program logic strings
-3. Suspicious fragments
-4. Function names
+1. **Normal System Strings**  
+   Standard library and system references.
 
-### Important Strings Found
+2. **Program Logic Strings**  
+   Messages indicating program behavior.
+
+3. **Suspicious Fragments**  
+   Possible pieces of hidden data.
+
+4. **Function Names**
+
+---
+
+### Important Program Strings
+
+The following strings were discovered:
 
 ```
 Usage: ./vault [OPTIONS]
+
 --flag
 --intro
 --help
+
 Enter the password to access the Flag:
 Better Luck Next Time!
 Too many arguments, try again!!!
 ```
 
-### Findings
+### Key Findings
 
-- The program accepts command-line options.
-- Access to the flag requires a **password**.
-- Several strings ended with **letter 'f'**, indicating fragmented storage.
-- Function names revealed:
+- The program contains a **password-protected flag**
+- Flag retrieval requires **correct password input**
+- Certain strings appear to end with **character fragments**
+- Flag components may be **constructed dynamically**
+
+---
+
+## Function Discovery
+
+Important functions identified:
 
 ```
 concatpasswd
 concatflag
 ```
 
-This indicates that the **password and flag are constructed dynamically during execution**.
+These names suggest that:
+
+- The **password is assembled dynamically**
+- The **flag is also constructed at runtime**
 
 ---
 
-# 6. Static Analysis Using objdump
+# 5. Disassembly Analysis
 
-The binary was disassembled using:
+To analyze the binary structure, **objdump** was used.
 
 ```
 objdump -d vault | grep concat
@@ -188,51 +236,61 @@ objdump -d vault | grep concat
 
 ### Findings
 
-Both functions were referenced inside the **main function**.
+The functions:
 
-This confirmed:
+```
+concatpasswd
+concatflag
+```
 
-- The **password and flag are assembled during runtime**
-- String fragments are pushed to the stack and concatenated
+are **called inside the main function**.
 
-The investigation then focused on where **concatflag** was called.
+This indicates:
+
+- The password and flag are **not stored directly**
+- They are **built during execution**
 
 ---
 
-# 7. Disassembly Analysis
+## Inspecting Function Calls
 
-The `main` function was analyzed to reconstruct the stack behavior.
+The flag fragments are passed into the **concatflag** function from `main`.
 
-Key observations included:
-
-- Function arguments pushed onto the stack
-- Little-endian hexadecimal constants
-- Reverse order argument passing
-
-Relevant instructions:
+Relevant assembly instructions:
 
 ```
-144c: lea -0x68(%ebp),%eax → push
-1450: lea -0x62(%ebp),%eax → push
-1454: lea -0x6e(%ebp),%eax → push
-1458: lea -0x50(%ebp),%eax → push
+144c: lea -0x68(%ebp),%eax
+1450: lea -0x62(%ebp),%eax
+1454: lea -0x6e(%ebp),%eax
+1458: lea -0x50(%ebp),%eax
 ```
 
-### Key Observations
+These instructions push memory references onto the stack.
 
-- Some arguments are pushed in **reverse order**
-- Hexadecimal fragments represent ASCII characters
-- Values are stored using **little-endian format**
+### Important Observation
+
+Arguments are pushed in **reverse order** due to the **x86 calling convention**.
 
 ---
 
-# 8. Fragment Decoding
+# 6. Reconstruction
 
-The flag was stored as **hexadecimal fragments**.
+## Flag Fragment Analysis
 
-Each fragment was decoded and combined.
+The flag fragments were stored as **hexadecimal constants** in **little-endian format**.
 
-### Fragment 1
+Each fragment needed to be:
+
+1. Converted from hex
+2. Reversed (little-endian correction)
+3. Translated to ASCII
+4. Combined in the correct order
+
+---
+
+### Fragment Decoding
+
+Fragment 1
 
 ```
 0x67616c46 + 0x7b
@@ -246,7 +304,7 @@ Flag{
 
 ---
 
-### Fragment 2
+Fragment 2
 
 ```
 0x41753059 + 0x72
@@ -260,7 +318,7 @@ Y0uAr
 
 ---
 
-### Fragment 3
+Fragment 3
 
 ```
 0x72434133 + 0x61
@@ -274,7 +332,7 @@ Decoded:
 
 ---
 
-### Fragment 4
+Fragment 4
 
 ```
 0x72336b63 + 0x7d
@@ -288,9 +346,9 @@ ck3r}
 
 ---
 
-# 9. Reconstructed Flag
+## Reconstructed Flag
 
-Combining all fragments resulted in the final flag:
+Combining all fragments:
 
 ```
 Flag{Y0uAr3ACrack3r}
@@ -298,13 +356,11 @@ Flag{Y0uAr3ACrack3r}
 
 ---
 
-# 10. Password Reconstruction
+## Password Reconstruction
 
-The same method was applied to analyze the **concatpasswd** function.
+The **concatpasswd** function was analyzed using the same process.
 
-Fragments used for password construction were decoded and combined.
-
-### Final Password
+After decoding and assembling the fragments, the reconstructed password was:
 
 ```
 S7p3rS3ct3rOrgan1z2t10n
@@ -312,42 +368,42 @@ S7p3rS3ct3rOrgan1z2t10n
 
 ---
 
-# 11. Verification
+# 7. Verification
 
-The binary was executed with the recovered password and flag option.
-
-Command:
+To confirm the findings, the program was executed with the correct option:
 
 ```
 ./vault --flag
 ```
 
-Output:
+After entering the reconstructed password, the program returned:
 
 ```
 Flag{Y0uAr3ACrack3r}
 ```
 
-This confirmed that the reconstructed flag was correct.
+This confirms that both the **password and flag reconstruction were correct**.
 
 ---
 
-# 12. Conclusion
+# 8. Conclusion
 
-This reverse engineering challenge demonstrated several key binary analysis techniques:
+This challenge required detailed **static and disassembly analysis** of a Linux executable.
 
-- Reconnaissance of suspicious archives
-- Binary identification and inspection
-- Static analysis using **strings** and **objdump**
-- Understanding **stack-based string construction**
-- Analyzing **function calls and calling conventions**
-- Decoding **little-endian hexadecimal data**
-- Reconstructing hidden runtime values
+Key reverse engineering techniques used:
 
-Through careful analysis of the binary's internal logic, both the **hidden password** and the **final flag** were successfully recovered.
+- Binary identification
+- Strings extraction
+- Static disassembly
+- Stack argument reconstruction
+- Little-endian decoding
+- Manual reconstruction of runtime strings
 
-Final Flag:
+Through these techniques, the hidden program logic was understood, and both the **password and flag were successfully reconstructed**.
 
-```
-Flag{Y0uAr3ACrack3r}
-```
+The challenge demonstrated practical skills in:
+
+- Linux binary reverse engineering
+- Assembly code interpretation
+- Program flow analysis
+- Data reconstruction from memory fragments

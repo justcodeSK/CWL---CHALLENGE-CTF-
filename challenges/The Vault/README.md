@@ -10,7 +10,19 @@
 7. Conclusion  
 
 ---
+## Tools Used (Reverse Engineering)
 
+The following tools were used during the reverse engineering analysis of the binary:
+
+- **file** – Identified the binary format and architecture.
+- **unzip** – Inspected and extracted the archive contents.
+- **strings** – Extracted readable text from the binary to locate clues.
+- **objdump** – Disassembled the binary to analyze program structure and function calls.
+- **grep** – Filtered relevant functions and strings during analysis.
+- **less** – Used for navigating large outputs from analysis tools.
+
+These tools enabled static analysis of the binary and helped reconstruct hidden program data such as the password and flag.
+---
 # 1. Scope & Objective
 
 This challenge involves **reverse engineering a Linux binary** provided in a compressed archive named **"The Vault.zip"**.
